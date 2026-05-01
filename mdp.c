@@ -1,8 +1,8 @@
 /*
  * mdp.c - Herramienta MDP (terminal) - FES Acatlán, UNAM
  *
- * Incluye: Ingreso de datos, Visualización, 5 métodos de solución,
- *          Comparación, Exportación y pantalla de despedida.
+ * Incluye: Ingreso, Visualización, 5 métodos (con pasos detallados),
+ *          Comparación mejorada, y pantalla de despedida animada.
  * Compilar: gcc -o mdp mdp.c -lm
  * Ejecutar: ./mdp
  */
@@ -50,12 +50,12 @@ void mostrar_portada() {
     limpiar();
     printf("\033[1;33m");
     printf("╔═══════════════════════════════════════════════════════╗\n");
-    printf("║     UNIVERSIDAD NACIONAL AUTÓNOMA DE MÉXICO          ║\n");
-    printf("║     FACULTAD DE ESTUDIOS SUPERIORES ACATLÁN          ║\n");
+    printf("║     UNIVERSIDAD NACIONAL AUTÓNOMA DE MÉXICO           ║\n");
+    printf("║     FACULTAD DE ESTUDIOS SUPERIORES ACATLÁN           ║\n");
     printf("╚═══════════════════════════════════════════════════════╝\n");
     printf("\033[0m\n");
     printf("\033[1;34m       HERRAMIENTA MDP - PROCESOS ESTOCÁSTICOS\033[0m\n\n");
-    printf("  Profesora: [Nombre]\n  Integrantes: [Nombres]\n\n");
+    printf("  Profesora: Cuéllar Aguayo Ada Ruth\n  Integrantes: Hernández Pérez Victoria\n               Martínez Macouzet Enrique\n\n\n");
     printf("  Esta herramienta permite modelar y resolver\n");
     printf("  Procesos Markovianos de Decisión mediante\n");
     printf("  5 métodos de solución diferentes.\n");
@@ -202,8 +202,8 @@ void enumeracion_exhaustiva() {
     pausar();
 }
 
-/* ========== SIMPLEX DOS FASES ========== */
-int simplex_dos_fases(double c_obj[MAX_VARS], double A_eq[MAX_RESTRICCIONES][MAX_VARS], double b_eq[MAX_RESTRICCIONES], int n_vars, int n_restr, double *x_opt, double *z_opt, const char **var_names) {
+/* ========== SIMPLEX DOS FASES (con control verbose) ========== */
+int simplex_dos_fases(double c_obj[MAX_VARS], double A_eq[MAX_RESTRICCIONES][MAX_VARS], double b_eq[MAX_RESTRICCIONES], int n_vars, int n_restr, double *x_opt, double *z_opt, const char **var_names, int verbose) {
     int n_art = n_restr;
     int n_total = n_vars + n_art;
     double tabla[MAX_RESTRICCIONES+1][MAX_VARS+MAX_RESTRICCIONES+1]={{0}};
@@ -216,6 +216,8 @@ int simplex_dos_fases(double c_obj[MAX_VARS], double A_eq[MAX_RESTRICCIONES][MAX
     for(int j=n_vars;j<n_total;j++) tabla[n_restr][j] = 1.0;
     tabla[n_restr][n_total] = 0.0;
     for(int i=0;i<n_restr;i++) for(int j=0;j<=n_total;j++) tabla[n_restr][j] -= tabla[i][j];
+
+    if(verbose) printf("\n--- Fase 1 ---\n");
     for(int iter=0;iter<MAX_ITER_SIMPLEX;iter++){
         int col_piv=-1; double min_val=0;
         for(int j=0;j<n_total;j++) if(tabla[n_restr][j] < min_val){ min_val=tabla[n_restr][j]; col_piv=j; }
@@ -227,13 +229,20 @@ int simplex_dos_fases(double c_obj[MAX_VARS], double A_eq[MAX_RESTRICCIONES][MAX
         }
         if(fila_piv==-1) return 0;
         double piv=tabla[fila_piv][col_piv];
+        if(verbose) printf("Pivote: (%d,%d) = %.4f\n",fila_piv,col_piv,piv);
         for(int j=0;j<=n_total;j++) tabla[fila_piv][j]/=piv;
         for(int i=0;i<=n_restr;i++) if(i!=fila_piv){
             double f=tabla[i][col_piv];
             for(int j=0;j<=n_total;j++) tabla[i][j] -= f*tabla[fila_piv][j];
         }
+        if(verbose) {
+            for(int i=0;i<=n_restr;i++){ for(int j=0;j<=n_total;j++) printf("%8.4f ",tabla[i][j]); printf("\n"); }
+            printf("\n");
+        }
     }
     if(fabs(tabla[n_restr][n_total]) > 1e-6) return 0;
+    if(verbose) printf("Fin fase 1.\n");
+
     for(int j=0;j<=n_total;j++) tabla[n_restr][j] = 0.0;
     for(int j=0;j<n_vars;j++) tabla[n_restr][j] = c_obj[j];
     for(int i=0;i<n_restr;i++){
@@ -244,6 +253,8 @@ int simplex_dos_fases(double c_obj[MAX_VARS], double A_eq[MAX_RESTRICCIONES][MAX
             for(int j=0;j<=n_total;j++) tabla[n_restr][j] -= coef*tabla[i][j];
         }
     }
+
+    if(verbose) printf("\n--- Fase 2 ---\n");
     for(int iter=0;iter<MAX_ITER_SIMPLEX;iter++){
         int col_piv=-1; double min_val=0;
         for(int j=0;j<n_vars;j++) if(tabla[n_restr][j] < min_val){ min_val=tabla[n_restr][j]; col_piv=j; }
@@ -255,12 +266,18 @@ int simplex_dos_fases(double c_obj[MAX_VARS], double A_eq[MAX_RESTRICCIONES][MAX
         }
         if(fila_piv==-1) return 0;
         double piv=tabla[fila_piv][col_piv];
+        if(verbose) printf("Pivote: (%d,%d) = %.4f\n",fila_piv,col_piv,piv);
         for(int j=0;j<=n_total;j++) tabla[fila_piv][j]/=piv;
         for(int i=0;i<=n_restr;i++) if(i!=fila_piv){
             double f=tabla[i][col_piv];
             for(int j=0;j<=n_total;j++) tabla[i][j] -= f*tabla[fila_piv][j];
         }
+        if(verbose) {
+            for(int i=0;i<=n_restr;i++){ for(int j=0;j<=n_total;j++) printf("%8.4f ",tabla[i][j]); printf("\n"); }
+            printf("\n");
+        }
     }
+
     for(int j=0;j<n_vars;j++) x_opt[j]=0.0;
     for(int i=0;i<n_restr;i++){
         int var_basica=-1;
@@ -304,7 +321,7 @@ void programacion_lineal() {
     printf("Y >= 0\n");
     const char *varnames_ptr[MAX_VARS];
     for(int i=0;i<nv;i++) varnames_ptr[i]=var_names[i];
-    if(!simplex_dos_fases(c_obj,A_eq,b_eq,nv,nr,x_opt,&z_opt,varnames_ptr)){ printf("No factible.\n"); pausar(); return; }
+    if(!simplex_dos_fases(c_obj,A_eq,b_eq,nv,nr,x_opt,&z_opt,varnames_ptr, 1)){ printf("No factible.\n"); pausar(); return; }
     printf("\nSolución óptima:\n");
     for(int i=0;i<m.num_estados;i++){ double sum=0; for(int d=0;d<m.num_decisiones;d++) if(var_idx[i][d]>=0) sum+=x_opt[var_idx[i][d]]; if(sum>1e-9){ for(int d=0;d<m.num_decisiones;d++) if(var_idx[i][d]>=0) printf("D(%s,%s)=%.4f ",m.estados[i],m.decisiones[d],x_opt[var_idx[i][d]]/sum); printf("\n"); } }
     double valor_final = (m.tipo==0) ? z_opt : -z_opt;
@@ -379,9 +396,13 @@ void mejoramiento_politicas() {
         V[n-1]=0.0;
         printf("g=\033[1;32m%.4f\033[0m  V: ",g);
         for(int i=0;i<n;i++) printf("V%d=\033[1;33m%.4f\033[0m ",i,V[i]); printf("\n");
+
+        // Paso 2: comparación de decisiones (mostrando C + Σ P V - V_i)
+        printf("\nComparación de decisiones (C + Σ P V - V_i):\n");
         int nueva_pol[MAX_ESTADOS], igual=1;
         for(int i=0;i<n;i++){
             double mejor=(m.tipo==0)?1e30:-1e30; int best=-1;
+            // Encontramos la mejor decisión (mínimo de C+ΣPV)
             for(int d=0;d<m.num_decisiones;d++) if(m.estados_afectados[d][i]){
                 double sum=0; for(int j=0;j<n;j++) sum+=m.transiciones[d][i][j]*V[j];
                 double val=m.costos[i][d]+sum;
@@ -389,6 +410,15 @@ void mejoramiento_politicas() {
             }
             nueva_pol[i]=best;
             if(best!=pol[i]) igual=0;
+            // Ahora imprimimos tabla con C+ΣPV - V_i
+            printf("Estado %s:\n", m.estados[i]);
+            printf("  %-12s %-12s %s\n", "Decisión", "C+ΣPV - V_i", "Elegida");
+            for(int d=0;d<m.num_decisiones;d++) if(m.estados_afectados[d][i]){
+                double sum=0; for(int j=0;j<n;j++) sum+=m.transiciones[d][i][j]*V[j];
+                double val=m.costos[i][d]+sum;
+                double diff = val - V[i];
+                printf("  %-12s %-12.4f %s\n", m.decisiones[d], diff, (d==best)?"✅":"");
+            }
         }
         int idx_nueva = buscar_indice_politica(nueva_pol);
         printf("Nueva política: R%d = (",idx_nueva);
@@ -466,6 +496,8 @@ void mejoramiento_descuento() {
         for(int i=0;i<n;i++) V[i]=A[i][n];
         printf("V: ");
         for(int i=0;i<n;i++) printf("V%d=\033[1;33m%.4f\033[0m ",i,V[i]); printf("\n");
+
+        printf("\nComparación de decisiones (Q = C + α Σ P V):\n");
         int nueva_pol[MAX_ESTADOS], igual=1;
         for(int i=0;i<n;i++){
             double mejor=(m.tipo==0)?1e30:-1e30; int best=-1;
@@ -476,6 +508,13 @@ void mejoramiento_descuento() {
             }
             nueva_pol[i]=best;
             if(best!=pol[i]) igual=0;
+            printf("Estado %s:\n", m.estados[i]);
+            printf("  %-12s %-12s %s\n", "Decisión", "Q", "Elegida");
+            for(int d=0;d<m.num_decisiones;d++) if(m.estados_afectados[d][i]){
+                double sum=0; for(int j=0;j<n;j++) sum+=m.transiciones[d][i][j]*V[j];
+                double val=m.costos[i][d]+alpha*sum;
+                printf("  %-12s %-12.4f %s\n", m.decisiones[d], val, (d==best)?"✅":"");
+            }
         }
         int idx_nueva = buscar_indice_politica(nueva_pol);
         printf("Nueva política: R%d = (",idx_nueva);
@@ -527,7 +566,14 @@ void aproximaciones_sucesivas() {
             }
             V_nuevo[i]=mejor; pol[i]=best;
             double dif=fabs(mejor-V[i]); if(dif>max_dif) max_dif=dif;
-            printf("V%d = %.4f (anterior %.4f, dif %.4f) -> decisión %s\n",i,V_nuevo[i],V[i],dif,m.decisiones[best]);
+            printf("Estado %s:\n", m.estados[i]);
+            printf("  %-12s %-12s %s\n", "Decisión", "Q = C+αΣPV", "Elegida");
+            for(int d=0;d<m.num_decisiones;d++) if(m.estados_afectados[d][i]){
+                double sum=0; for(int j=0;j<m.num_estados;j++) sum+=m.transiciones[d][i][j]*V[j];
+                double val=m.costos[i][d]+alpha*sum;
+                printf("  %-12s %-12.4f %s\n", m.decisiones[d], val, (d==best)?"✅":"");
+            }
+            printf("  -> V%d = %.4f (anterior %.4f, dif %.4f)\n",i,V_nuevo[i],V[i],dif);
         }
         for(int i=0;i<m.num_estados;i++) V[i]=V_nuevo[i];
         printf("Diferencia máxima: %.6f\n",max_dif);
@@ -546,7 +592,6 @@ void aproximaciones_sucesivas() {
 /* ========== COMPARACIÓN DE MÉTODOS ========== */
 void comparacion() {
     limpiar(); printf("\033[1;34m═══ COMPARACIÓN DE MÉTODOS ═══\033[0m\n\n");
-    printf("Ejecutando todos los algoritmos...\n\n");
 
     int n = m.num_estados;
     int total_ee;
@@ -559,6 +604,7 @@ void comparacion() {
     char *nombres[5] = {"Enumeración Exhaustiva", "Programación Lineal",
                         "Mejoramiento Políticas", "Mejoramiento Descuento",
                         "Aprox. Sucesivas"};
+    double V_finales[5][MAX_ESTADOS];
 
     // Enumeración
     double mejor_esp_ee = (m.tipo==0)?1e30:-1e30;
@@ -581,7 +627,7 @@ void comparacion() {
     costos[0] = mejor_esp_ee;
     indices_res[0] = mejor_idx_ee;
 
-    // Programación Lineal
+    // Programación Lineal (verbose=0)
     int nv=0, var_idx[MAX_ESTADOS][MAX_DECISIONES]; memset(var_idx,-1,sizeof(var_idx));
     for(int i=0;i<n;i++) for(int d=0;d<m.num_decisiones;d++) if(m.estados_afectados[d][i]){ var_idx[i][d]=nv++; }
     double c_obj[MAX_VARS]={0}, A_eq[MAX_RESTRICCIONES][MAX_VARS]={{0}}, b_eq[MAX_RESTRICCIONES]={0}, x_opt[MAX_VARS]={0}, z_opt;
@@ -596,9 +642,9 @@ void comparacion() {
         }
         b_eq[nr++]=0.0;
     }
-    if(simplex_dos_fases(c_obj,A_eq,b_eq,nv,nr,x_opt,&z_opt,NULL)){
+    if(simplex_dos_fases(c_obj,A_eq,b_eq,nv,nr,x_opt,&z_opt,NULL, 0)){
         double val_pl = (m.tipo==0)?z_opt:-z_opt;
-        costos[1] = val_pl;
+        costos[1] = fabs(val_pl);
         int pol_pl[MAX_ESTADOS];
         for(int i=0;i<n;i++){ double maxD=-1; int best=-1; for(int d=0;d<m.num_decisiones;d++) if(var_idx[i][d]>=0){ double val=x_opt[var_idx[i][d]]; if(val>maxD){ maxD=val; best=d; } } pol_pl[i]=best; }
         memcpy(politicas_res[1], pol_pl, n*sizeof(int));
@@ -668,10 +714,10 @@ void comparacion() {
         memcpy(pol_mpd,nueva_pol,sizeof(pol_mpd));
         if(++iter>100) break;
     }
-    double costo_mpd = 0; for(int i=0;i<n;i++) costo_mpd += Vd[i]; costo_mpd /= n;
-    costos[3] = costo_mpd;
+    costos[3] = NAN;
     memcpy(politicas_res[3], pol_mpd, n*sizeof(int));
     indices_res[3] = buscar_indice_politica(pol_mpd);
+    memcpy(V_finales[3], Vd, n*sizeof(double));
 
     // Aproximaciones sucesivas
     double V_as[MAX_ESTADOS], V_nuevo_as[MAX_ESTADOS];
@@ -698,21 +744,28 @@ void comparacion() {
         for(int i=0;i<n;i++) V_as[i]=V_nuevo_as[i];
         if(max_dif<0.001) break;
     }
-    double costo_as = 0; for(int i=0;i<n;i++) costo_as += V_as[i]; costo_as /= n;
-    costos[4] = costo_as;
+    costos[4] = NAN;
     memcpy(politicas_res[4], pol_as, n*sizeof(int));
     indices_res[4] = buscar_indice_politica(pol_as);
+    memcpy(V_finales[4], V_as, n*sizeof(double));
 
-    printf("\n\033[1;33m%-25s %-12s %-20s\033[0m\n", "Método", "Costo/Gan.", "Política");
-    printf("-------------------------------------------------------------\n");
+    printf("\n\033[1;33m%-25s %-12s %-20s %-30s\033[0m\n", "Método", "Costo/Gan.", "Política", "V finales (si aplica)");
+    printf("-------------------------------------------------------------------------------------------\n");
     for(int i=0;i<5;i++){
-        printf("%-25s %-12.4f ", nombres[i], costos[i]);
+        printf("%-25s ", nombres[i]);
+        if(isnan(costos[i])) printf("%-12s ", "—");
+        else printf("%-12.4f ", costos[i]);
         printf("R%d = (", indices_res[i]);
         for(int j=0;j<n;j++) {
             printf("%s", m.decisiones[politicas_res[i][j]]);
             if(j < n-1) printf(", ");
         }
-        printf(")\n");
+        printf(")");
+        if(isnan(costos[i]) && i>=3) {
+            printf("  V: ");
+            for(int j=0;j<n;j++) printf("V%d=%.2f ", j, V_finales[i][j]);
+        }
+        printf("\n");
     }
 
     int iguales = 1;
@@ -726,19 +779,6 @@ void comparacion() {
     pausar();
 }
 
-/* ========== EXPORTAR RESULTADOS ========== */
-void exportar() {
-    limpiar(); printf("\033[1;34m═══ EXPORTAR RESULTADOS ═══\033[0m\n\n");
-    printf("Guardando resultados de la comparación en 'resultados.txt'...\n");
-    FILE *f = fopen("resultados.txt", "w");
-    if(!f){ printf("Error al crear archivo.\n"); pausar(); return; }
-    fprintf(f, "Resultados de la comparación\n");
-    fprintf(f, "Método; Costo; Política\n");
-    fclose(f);
-    printf("Archivo creado correctamente.\n");
-    pausar();
-}
-
 /* ========== PANTALLA DE DESPEDIDA ========== */
 void despedida() {
     limpiar();
@@ -748,14 +788,26 @@ void despedida() {
     printf("  ║      LA HERRAMIENTA MDP - FES ACATLÁN    ║\n");
     printf("  ╚══════════════════════════════════════════╝\n");
     printf("\033[0m\n");
-    for(int i=0;i<3;i++){
-        printf("       🚀    🚀    🚀\n");
+    for(int i=0;i<5;i++){
+        printf("       🚀  🚀  🚀  🚀  🚀\n");
         fflush(stdout);
-        usleep(200000);
+        usleep(150000);
         printf("\033[1A");
-        printf("      🚀    🚀    🚀\n");
+        printf("      🚀  🚀  🚀  🚀  🚀  🚀\n");
         fflush(stdout);
-        usleep(200000);
+        usleep(150000);
+        printf("\033[1A");
+        printf("     🚀  🚀  🚀  🚀  🚀  🚀  🚀\n");
+        fflush(stdout);
+        usleep(150000);
+        printf("\033[1A");
+        printf("    🚀  🚀  🚀  🚀  🚀  🚀  🚀  🚀\n");
+        fflush(stdout);
+        usleep(150000);
+        printf("\033[1A");
+        printf("   🚀  🚀  🚀  🚀  🚀  🚀  🚀  🚀  🚀\n");
+        fflush(stdout);
+        usleep(150000);
         printf("\033[1A");
     }
     printf("\n\nPresiona ENTER para salir...");
@@ -772,8 +824,7 @@ int main() {
         printf("\033[1;33m║\033[0m  2. Visualización de Datos                  \033[1;33m║\033[0m\n");
         printf("\033[1;33m║\033[0m  3. Métodos de Solución                     \033[1;33m║\033[0m\n");
         printf("\033[1;33m║\033[0m  4. Comparación de Métodos                  \033[1;33m║\033[0m\n");
-        printf("\033[1;33m║\033[0m  5. Exportar Resultados                     \033[1;33m║\033[0m\n");
-        printf("\033[1;33m║\033[0m  6. Salir                                   \033[1;33m║\033[0m\n");
+        printf("\033[1;33m║\033[0m  5. Salir                                   \033[1;33m║\033[0m\n");
         printf("\033[1;33m╚═════════════════════════════════════════════╝\033[0m\n");
         printf("Opción: "); scanf("%d",&op); while(getchar()!='\n');
         switch(op){
@@ -795,8 +846,7 @@ int main() {
                 break;
             }
             case 4: comparacion(); break;
-            case 5: exportar(); break;
-            case 6: despedida(); return 0;
+            case 5: despedida(); return 0;
             default: limpiar(); printf("Opción no válida\n"); pausar();
         }
     } while(1);
